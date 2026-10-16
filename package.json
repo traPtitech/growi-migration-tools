@@ -14,7 +14,8 @@
     "test": "vitest run",
     "typecheck": "tsc --noEmit",
     "build": "tsc -p tsconfig.build.json",
-    "merge-duplicate-users": "node src/merge-duplicate-users/cli.ts"
+    "merge-duplicate-users": "node src/merge-duplicate-users/cli.ts",
+    "prepare-legacy-migration": "node src/prepare-legacy-migration/cli.ts"
   },
   "dependencies": {
     "bson": "4.7.2",
