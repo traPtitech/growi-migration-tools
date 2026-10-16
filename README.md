@@ -98,3 +98,57 @@ TEST_MONGO_URI='mongodb://127.0.0.1:27017/?directConnection=true' pnpm test
 ## ライセンス
 
 MIT。GROWI内で作成した補正スクリプトを、単独で実行できるようにしたもの。GROWI由来のライセンスは [LICENSE](LICENSE) に同梱。
+
+## 重複ユーザーの統合
+
+`merge-duplicate-users` は、完全一致するユーザー名のレコードを同一人物として統合する手動ツール。各組の最古ObjectIdを残し、そのプロフィール・作成日時・資格情報を保持する。メール、status、管理者・読み取り専用フラグが組内で異なる場合や、統合元に別の外部ID・APIトークン・プロフィールがある場合は中止する。別ユーザー名間のメール重複も中止する。
+
+推奨実行時点は、MongoDBのレプリカセットへ復元後、GROWIのスキーマ移行前。旧CrowiのMongoDB 3.6では実行しない。移行済みGROWIのDBにも利用できる。
+
+### 計画と適用
+
+最初は別名DBへ復元したコピーで検証する。バックアップを取得し、対象DBを利用するGROWI・ワーカーを停止してから実行する。接続先の指定は上記と同じ。
+
+```sh
+pnpm merge-duplicate-users \
+  --database growi \
+  --report reports/users-plan.json
+
+pnpm merge-duplicate-users \
+  --database growi \
+  --apply --plan reports/users-plan.json \
+  --report reports/users-applied.json
+```
+
+初回は読み取りだけ。`groups` の統合先・削除元、`changes` と `referenceUpdates` を確認する。計画にはユーザー名・メール・IDを含むため公開しない。レポートは新規ファイルだけに作成し、権限を0600にする。
+
+適用時には入力DB全体のドキュメント・インデックスと仮名化対応表のfingerprintを再照合し、変更後の古い計画は拒否する。実行内容はDBから再計算するため、計画の `changes` を手で書き換えて適用内容を変更することはできない。ドキュメントの照合にはBSON表現を使い、型の違いも検出する。停止状態で計画から適用まで実行すること。
+
+変更は1トランザクションで適用する。ページの作者・最終更新者・削除者・許可ユーザー・既読・いいね、履歴作者、コメント・添付作者、ブックマーク、グループ・外部アカウント等の参照を付け替える。配列は同一人物分を重複排除する。本文・ページID・revision ID・パス・日時・grant・添付キーは変更しない。本文中の旧IDも歴史的記録として保持する。
+
+同一ページのブックマークが衝突する場合は、統合先ユーザーの既存レコードを優先し、なければ最小のブックマークIDを残す。フォルダ内のブックマーク参照も残るIDへ付け替えて重複排除する。UI設定・日別contributionなど、その他の一意制約の衝突は自動統合せず、DBエラーで全変更をロールバックする。
+
+既知の参照を置換した後に、削除対象IDが未対応の構造化フィールドに残る場合は計画を作らず中止する。保留中の `pageoperations` や、削除対象IDを含むセッションも先に解消すること。構造化参照の対象一覧は `src/merge-duplicate-users/references.ts`。新しいモデルを持つDBへ適用する際は、この一覧と各モデルを照合する。
+
+### リハーサル時の仮名からの復元
+
+過去の検証で `rehearsal-...` へ変更したDBは、明示的な対応表を両方のコマンドに指定する。名前の形式からの推測は行わない。
+
+```sh
+pnpm merge-duplicate-users \
+  --database growi \
+  --aliases /private/path/user-aliases.json \
+  --report reports/users-plan.json
+
+pnpm merge-duplicate-users \
+  --database growi \
+  --aliases /private/path/user-aliases.json \
+  --apply --plan reports/users-plan.json \
+  --report reports/users-applied.json
+```
+
+対応表は `{ "id": "24文字のObjectId", "field": "usernameまたはemail", "original": "元の値", "replacement": "仮名" }` の配列。保存値が元の値・仮名のどちらでもなければ中止する。統合先が仮名化されている場合は、元の名前・メールを復元する。削除済みIDの対応表は再実行時に無視する。実データの対応表をgitに追加しない。
+
+適用後は新しいレポートへ再ドライランし、変更0件を確認する。完了したトランザクションを戻す場合は事前バックアップから復元する。GROWIのユーザー削除APIはユーザーホーム・グループ・外部アカウントを変更するため、この統合の代用にはしない。
+
+再起動後はtraQの認証先IDと、旧所有者限定ページ・履歴・ブックマークの利用を確認する。卒業者の利用停止、管理者の見直し、旧APIトークンの廃止はこの処理では行わない。検索やVault等を利用している場合は派生データも再構築する。
