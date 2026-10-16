@@ -1,0 +1,28 @@
+{
+  "name": "@traptitech/growi-migration-tools",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "Manual MongoDB migration tools for legacy Crowi to GROWI",
+  "license": "MIT",
+  "engines": {
+    "node": ">=24"
+  },
+  "scripts": {
+    "normalize-trailing-slashes": "node src/normalize-trailing-slashes/cli.ts",
+    "lint": "biome check .",
+    "test": "vitest run",
+    "typecheck": "tsc --noEmit",
+    "build": "tsc -p tsconfig.build.json"
+  },
+  "dependencies": {
+    "mongodb": "4.17.2"
+  },
+  "devDependencies": {
+    "@biomejs/biome": "2.4.12",
+    "@types/node": "^24.0.0",
+    "typescript": "5.9.3",
+    "vitest": "3.2.6"
+  },
+  "packageManager": "pnpm@11.27.0"
+}
