@@ -15,11 +15,14 @@
     "typecheck": "tsc --noEmit",
     "build": "tsc -p tsconfig.build.json",
     "merge-duplicate-users": "node src/merge-duplicate-users/cli.ts",
-    "prepare-legacy-migration": "node src/prepare-legacy-migration/cli.ts"
+    "prepare-legacy-migration": "node src/prepare-legacy-migration/cli.ts",
+    "migrate-attachments": "node src/migrate-attachments/cli.ts"
   },
   "dependencies": {
     "bson": "4.7.2",
-    "mongodb": "4.17.2"
+    "mdast-util-from-markdown": "^2.1.0",
+    "mongodb": "4.17.2",
+    "parse5": "^8.0.1"
   },
   "devDependencies": {
     "@biomejs/biome": "2.4.12",
