@@ -243,3 +243,28 @@ DBとSwiftのバックアップを保存し、GROWIとワーカーを停止し�
 完了後、GROWIの保存先をS3へ設定し、閲覧権限と画像表示を確認する。検索インデックス・Vault等の派生データは必要に応じて再構築する。ツールからGROWIの更新イベントは発行しない。元のSwiftオブジェクトは削除しない。
 
 `pnpm test` では、rcloneがインストールされていれば一時ローカルディレクトリで実ファイルのコピー・検証・再実行・衝突拒否も確認する。`TEST_MONGO_URI` 指定時は一時DBで現行本文のみの変換と古い計画の拒否を確認する。
+
+
+## 旧Crowi記法の本文変換
+
+GROWI標準スキーマ移行後に `migrate-legacy-markdown` を使い、現行ページの最新リビジョンを変換する。`:::success` は緑色の `:::tip` に、Crowiの `[/path]` と `<//path>` はGROWI標準レンダラーが扱う `[[/path]]` に変換する。過去のリビジョンは変更しない。
+
+ドライランはDBを書き換えず、本文の変更前後をレポートに出力する。レポートは本文を含むため公開せず、内容を確認してから適用する。
+
+```sh
+export MONGO_URI='mongodb://127.0.0.1:27017/?directConnection=true'
+mkdir -p reports
+pnpm migrate-legacy-markdown --database growi --report reports/legacy-markdown-plan.json
+```
+
+適用前にDBのバックアップを保存し、GROWIとワーカーを停止する。適用ではドライランと同じDBを指定し、確認済み計画と別のレポートファイルを使う。DBの状態が計画作成後に変わっていたら適用を拒否する。
+
+```sh
+pnpm migrate-legacy-markdown \
+  --database growi \
+  --apply \
+  --plan reports/legacy-markdown-plan.json \
+  --report reports/legacy-markdown-applied.json
+```
+
+適用後にページ表示とページリンクの遷移を確認する。ツールは最新リビジョンの本文のみを更新し、ページや過去のリビジョンには触れない。
